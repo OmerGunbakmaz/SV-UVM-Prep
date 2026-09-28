@@ -1,7 +1,5 @@
-//=============================================================================
-// fifo_pair.sv -- icinde 2 tane sync_fifo barindiran ara katman.
-// Tek amaci: hiyerarsiyi derinlestirip gercek bir tasarima benzetmek.
-//=============================================================================
+// fifo_pair.sv -- an intermediate layer holding 2 sync_fifo instances.
+// Its only purpose: deepen the hierarchy to resemble a real design.
 module fifo_pair #(
     parameter int DATA_WIDTH = 32,
     parameter int DEPTH      = 16,

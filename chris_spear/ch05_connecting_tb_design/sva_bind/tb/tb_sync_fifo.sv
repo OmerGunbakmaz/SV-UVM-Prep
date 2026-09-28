@@ -1,8 +1,6 @@
-//=============================================================================
-// tb_sync_fifo.sv  --  basit yonlendirilmis (directed) testbench
+// tb_sync_fifo.sv  --  simple directed testbench
 //
-// Burada gorulecek asil sey en asagidaki `bind` satiri.
-//=============================================================================
+// The real thing to look at here is the `bind` line at the very bottom.
 `timescale 1ns/1ps
 
 module tb_sync_fifo;
@@ -19,18 +17,14 @@ module tb_sync_fifo;
   logic                  full, almost_full, empty, almost_empty, rd_valid;
   logic [$clog2(DEPTH+1)-1:0] count;
 
-  // referans model: FIFO'ya ne yazdiysak burada da tutuyoruz
+  // reference model: whatever we write into the FIFO we keep here too
   logic [DATA_WIDTH-1:0] ref_q [$];
   int errors = 0;
 
-  //---------------------------------------------------------------------------
-  // Saat
-  //---------------------------------------------------------------------------
+  // Clock
   always #5 clk = ~clk;          // 100 MHz
 
-  //---------------------------------------------------------------------------
   // DUT
-  //---------------------------------------------------------------------------
   sync_fifo #(
     .DATA_WIDTH (DATA_WIDTH),
     .DEPTH      (DEPTH),
@@ -50,10 +44,7 @@ module tb_sync_fifo;
     .count        (count)
   );
 
-  //---------------------------------------------------------------------------
-  // Surucu task'lari (negedge'de surup posedge'de DUT'un ornekleme yapmasini
-  // saglıyoruz -> yaris kosulu yok)
-  //---------------------------------------------------------------------------
+  // Driver tasks (drive on negedge so the DUT samples on posedge -> no race)
   task automatic do_write(input logic [DATA_WIDTH-1:0] d);
     @(negedge clk);
     wr_en   = 1'b1;
@@ -67,7 +58,7 @@ module tb_sync_fifo;
     logic [DATA_WIDTH-1:0] got, exp;
     @(negedge clk);
     rd_en = 1'b1;
-    got   = rd_data;              // FWFT: veri zaten cikista hazir
+    got   = rd_data;              // FWFT: data is already at the output
     @(negedge clk);
     rd_en = 1'b0;
 
@@ -80,9 +71,7 @@ module tb_sync_fifo;
       $display("  [%0t] okundu: %0h  (count=%0d)", $time, got, count);
   endtask
 
-  //---------------------------------------------------------------------------
-  // Test senaryosu
-  //---------------------------------------------------------------------------
+  // Test scenario
   initial begin
     wr_en = 0; rd_en = 0; wr_data = '0;
     rst_n = 0;
@@ -111,12 +100,12 @@ module tb_sync_fifo;
     repeat (DEPTH) do_read();
     $display("  count=%0d empty=%0b almost_empty=%0b", count, empty, almost_empty);
 
-    // Bu blok sadece "vsim ... +VIOLATE" ile calisir.
-    // Amaci: bind edilmis assertion'in gercekten atesledigini gormek.
+    // This block only runs with "vsim ... +VIOLATE".
+    // Its purpose: see the bound assertion actually fire.
     if ($test$plusargs("VIOLATE")) begin
       $display("\n--- 5) KASITLI HATA: bos FIFO'dan okuma ---");
       @(negedge clk);
-      rd_en = 1'b1;              // empty=1 iken -> a_no_rd_when_empty patlar
+      rd_en = 1'b1;              // with empty=1 -> a_no_rd_when_empty fires
       @(negedge clk);
       rd_en = 1'b0;
     end
@@ -127,18 +116,16 @@ module tb_sync_fifo;
     $finish;
   end
 
-  //---------------------------------------------------------------------------
-  //                        >>>  ISTE BURASI  <<<
+  //                        >>>  HERE IT IS  <<<
   //
-  //  bind  <hedef modul>  <yerlestirilecek modul> <ornek adi> (<portlar>);
+  //  bind  <target module>  <module to place> <instance name> (<ports>);
   //
-  //  Parantezin ICINDEKI isimler (clk, wr_ptr, rd_ptr ...) tb'nin degil,
-  //  HEDEFIN yani sync_fifo'nun kendi ic isim uzayindan cozuluyor.
-  //  Bu yuzden wr_ptr/rd_ptr gibi disari cikmayan sinyallere erisebiliyoruz.
+  //  The names INSIDE the parentheses (clk, wr_ptr, rd_ptr ...) are resolved
+  //  in the TARGET's (sync_fifo's) own name space, not the tb's.
+  //  That is why we can reach signals like wr_ptr/rd_ptr that never leave it.
   //
-  //  "sync_fifo" yazdigimiz icin tasarimdaki TUM sync_fifo kopyalarina
-  //  takilir. Tek bir tanesini istesek: bind tb_sync_fifo.dut ...
-  //---------------------------------------------------------------------------
+  //  Because we wrote "sync_fifo" it attaches to ALL sync_fifo copies in the
+  //  design. To target just one: bind tb_sync_fifo.dut ...
   bind sync_fifo sync_fifo_sva #(
       .DEPTH (DEPTH),
       .PTR_W (PTR_W)
@@ -150,8 +137,8 @@ module tb_sync_fifo;
       .full   (full),
       .empty  (empty),
       .count  (count),
-      .wr_ptr (wr_ptr),     // <-- sync_fifo'nun IC sinyali
-      .rd_ptr (rd_ptr)      // <-- sync_fifo'nun IC sinyali
+      .wr_ptr (wr_ptr),     // <-- sync_fifo's INTERNAL signal
+      .rd_ptr (rd_ptr)      // <-- sync_fifo's INTERNAL signal
   );
 
 endmodule

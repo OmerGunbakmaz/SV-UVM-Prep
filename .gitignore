@@ -1,0 +1,8 @@
+# simulasyon ciktilari
+build/
+work/
+transcript
+*.wlf
+*.vcd
+*.vstf
+modelsim.ini

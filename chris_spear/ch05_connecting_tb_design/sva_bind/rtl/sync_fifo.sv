@@ -1,26 +1,24 @@
-//=============================================================================
-// sync_fifo.sv  --  Senkron FIFO (tek clock domain)
+// sync_fifo.sv  --  Synchronous FIFO (single clock domain)
 //
-// Bu dosya SADECE tasarim. Icinde assertion YOK.
-// Assertion'lar sva/sync_fifo_sva.sv icinde, bind ile disaridan baglaniyor.
-//=============================================================================
+// This file is design ONLY. There are no assertions inside it.
+// The assertions live in sva/sync_fifo_sva.sv, attached from outside via bind.
 module sync_fifo #(
     parameter int DATA_WIDTH = 32,
     parameter int DEPTH      = 16,
-    parameter int AF_TRESH   = DEPTH - 2,   // almost_full  esigi
-    parameter int AE_TRESH   = 2,           // almost_empty esigi
+    parameter int AF_TRESH   = DEPTH - 2,   // almost_full  threshold
+    parameter int AE_TRESH   = 2,           // almost_empty threshold
     parameter bit FWFT       = 1'b1         // 1: First-Word-Fall-Through
   )(
     input  logic clk,
     input  logic rst_n,
 
-    // yazma tarafi
+    // write side
     input  logic                    wr_en,
     input  logic [DATA_WIDTH-1:0]   wr_data,
     output logic                    full,
     output logic                    almost_full,
 
-    // okuma tarafi
+    // read side
     input  logic                    rd_en,
     output logic [DATA_WIDTH-1:0]   rd_data,
     output logic                    rd_valid,
@@ -39,18 +37,14 @@ module sync_fifo #(
   assign push = wr_en & ~full;
   assign pop  = rd_en & ~empty;
 
-  //---------------------------------------------------------------------------
-  // Bellek yazma
-  //---------------------------------------------------------------------------
+  // Memory write
   always_ff @(posedge clk) begin
     if (push)
       mem[wr_ptr] <= wr_data;
   end
 
-  //---------------------------------------------------------------------------
-  // Pointer'lar
-  //   DIKKAT: wr_ptr push ile, rd_ptr pop ile artar. Ikisi bagimsiz.
-  //---------------------------------------------------------------------------
+  // Pointers
+  //   NOTE: wr_ptr increments on push, rd_ptr on pop. The two are independent.
   always_ff @(posedge clk or negedge rst_n) begin
     if (!rst_n) begin
       wr_ptr <= '0;
@@ -64,9 +58,7 @@ module sync_fifo #(
     end
   end
 
-  //---------------------------------------------------------------------------
-  // Doluluk sayaci
-  //---------------------------------------------------------------------------
+  // Occupancy counter
   always_ff @(posedge clk or negedge rst_n) begin
     if (!rst_n)
       count <= '0;
@@ -81,17 +73,15 @@ module sync_fifo #(
   assign almost_full  = (count >= AF_TRESH[$bits(count)-1:0]);
   assign almost_empty = (count <= AE_TRESH[$bits(count)-1:0]);
 
-  //---------------------------------------------------------------------------
-  // Okuma yolu
-  //---------------------------------------------------------------------------
+  // Read path
   generate
     if (FWFT) begin : g_fwft
-      // Veri FIFO'ya girer girmez cikista hazir. rd_en sadece "tukettim" der.
+      // Data is ready at the output as soon as it enters the FIFO. rd_en just says "consumed".
       assign rd_data  = mem[rd_ptr];
       assign rd_valid = ~empty;
     end
     else begin : g_std
-      // Klasik: rd_en'den 1 clock sonra veri gelir.
+      // Classic: data appears 1 clock after rd_en.
       always_ff @(posedge clk) begin
         if (pop) rd_data <= mem[rd_ptr];
       end
@@ -102,16 +92,14 @@ module sync_fifo #(
     end
   endgenerate
 
-  //---------------------------------------------------------------------------
-  // ORNEK 1: `ifndef SYNTHESIS
+  // EXAMPLE 1: `ifndef SYNTHESIS
   //
-  // Bu blok elaborasyon-zamani parametre kontrolu yapar. Sentez araci
-  // SYNTHESIS makrosunu otomatik tanimladigi icin bu blogu HIC gormez.
-  // Simulatorde ise makro tanimsizdir -> blok derlenir ve calisir.
+  // This block does elaboration-time parameter checking. The synthesis tool
+  // defines the SYNTHESIS macro automatically, so it NEVER sees this block.
+  // In simulation the macro is undefined -> the block is compiled and runs.
   //
-  // Not: parametre sanity-check'i tasarima ait bir sey oldugu icin burada
-  // duruyor. Protokol kurallarini denetleyen assertion'lar ise ayri dosyada.
-  //---------------------------------------------------------------------------
+  // Note: the parameter sanity-check belongs to the design, so it stays here.
+  // The assertions that check protocol rules live in a separate file.
 `ifndef SYNTHESIS
   initial begin
     if (DEPTH < 2)

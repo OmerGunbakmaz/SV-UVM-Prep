@@ -1,14 +1,12 @@
-//=============================================================================
-// tb_multi_fifo.sv -- "bind neden var?" sorusunun cevabi
+// tb_multi_fifo.sv -- the answer to "why does bind exist?"
 //
-// Tasarimda 3 tane sync_fifo var ve UCU DE farkli derinlikte:
+// The design has 3 sync_fifo instances, ALL at different depths:
 //     tb_multi_fifo.u_solo
 //     tb_multi_fifo.u_pair.g_fifo[0].u_fifo
 //     tb_multi_fifo.u_pair.g_fifo[1].u_fifo
 //
-// Ucunde de ayni hatayi yaptiriyoruz: bos FIFO'dan okuma.
-// Ucunu de yakalayan sey: EN ALTTAKI TEK SATIR.
-//=============================================================================
+// We make the same mistake in all three: reading from an empty FIFO.
+// What catches all three: THE SINGLE LINE AT THE BOTTOM.
 `timescale 1ns/1ps
 
 module tb_multi_fifo;
@@ -21,9 +19,7 @@ module tb_multi_fifo;
   logic rst_n;
   always #5 clk = ~clk;
 
-  //--------------------------------------------------------------------------
-  // 1) Dogrudan tb altinda duran FIFO
-  //--------------------------------------------------------------------------
+  // 1) A FIFO sitting directly under the tb
   logic solo_wr_en, solo_rd_en, solo_full, solo_empty;
 
   sync_fifo #(.DATA_WIDTH(DATA_WIDTH), .DEPTH(DEPTH)) u_solo (
@@ -33,9 +29,7 @@ module tb_multi_fifo;
     .almost_empty(), .count()
   );
 
-  //--------------------------------------------------------------------------
-  // 2) Ara katmanin icinde, generate dongusunde duran 2 FIFO daha
-  //--------------------------------------------------------------------------
+  // 2) 2 more FIFOs inside the intermediate layer, in a generate loop
   logic [1:0] pair_wr_en, pair_rd_en, pair_full, pair_empty;
 
   fifo_pair #(.DATA_WIDTH(DATA_WIDTH), .DEPTH(DEPTH), .N(2)) u_pair (
@@ -44,9 +38,7 @@ module tb_multi_fifo;
     .full(pair_full),   .empty(pair_empty)
   );
 
-  //--------------------------------------------------------------------------
-  // Senaryo: ucunde de bos FIFO'dan okuma dene
-  //--------------------------------------------------------------------------
+  // Scenario: try reading from an empty FIFO on all three
   initial begin
     solo_wr_en = 0; solo_rd_en = 0;
     pair_wr_en = '0; pair_rd_en = '0;
@@ -68,18 +60,15 @@ module tb_multi_fifo;
     $finish;
   end
 
-  //--------------------------------------------------------------------------
-  //  TEK SATIR. Uc FIFO'nun ucune birden takiliyor.
+  //  ONE LINE. It attaches to all three FIFOs at once.
   //
-  //  ".*" kullanabiliyoruz cunku sync_fifo_sva'nin port isimleri
+  //  We can use ".*" because sync_fifo_sva's port names
   //  (clk, rst_n, wr_en, rd_en, full, empty, count, wr_ptr, rd_ptr)
-  //  sync_fifo'nun icindeki isimlerle birebir ayni.
-  //--------------------------------------------------------------------------
+  //  match the names inside sync_fifo exactly.
   bind sync_fifo sync_fifo_sva #(.DEPTH(DEPTH), .PTR_W(PTR_W)) u_sva (.*);
 
-  //--------------------------------------------------------------------------
-  //  bind OLMASAYDI ayni isi TB'den yapmak icin sunu yazman gerekirdi
-  //  -- her instance icin ayri ayri, yolu elle:
+  //  WITHOUT bind you would have to write this from the TB to do the same
+  //  -- for each instance separately, spelling out the path by hand:
   //
   //  always @(posedge clk) if (rst_n && solo_rd_en && solo_empty)
   //      $error("underflow: u_solo");
@@ -90,8 +79,7 @@ module tb_multi_fifo;
   //                                  && u_pair.g_fifo[1].u_fifo.empty)
   //      $error("underflow: pair 1");
   //
-  //  ...ve bu SADECE bir kural icin. sync_fifo_sva'da 5 kural var -> 15 blok.
-  //  N=2 yerine N=8 olsa -> 45 blok. Instance adi degisse -> hepsi bozulur.
-  //--------------------------------------------------------------------------
+  //  ...and that is for ONE rule only. sync_fifo_sva has 5 rules -> 15 blocks.
+  //  N=8 instead of N=2 -> 45 blocks. Change an instance name -> all broken.
 
 endmodule
