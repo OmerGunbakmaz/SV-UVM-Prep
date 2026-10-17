@@ -1,6 +1,7 @@
 `timescale 1ns/1ps
 
-interface bus_if#(parameter WIDTH=8 , parameter DEPTH = 256)(input logic clk);
+interface bus_if(input logic clk);
+    import tb_pkg::*;
     logic rstn;
     logic we;
     logic [WIDTH -1 : 0]wdata;
@@ -22,7 +23,7 @@ interface bus_if#(parameter WIDTH=8 , parameter DEPTH = 256)(input logic clk);
         default input #1step output #1ns;
         input we,wdata,addr,valid,ready,rdata;
     endclocking
-    
+
     modport MON(clocking mon_cb,input clk,rstn);
     modport DRV(clocking drv_cb,input clk,output rstn);
 

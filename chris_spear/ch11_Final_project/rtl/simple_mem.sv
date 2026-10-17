@@ -1,4 +1,4 @@
-module simple_mem#(parameter WIDTH=8,parameter DEPTH = 256) (bus_if.DUT bif);
+module simple_mem#(parameter WIDTH=32,parameter DEPTH = 256) (bus_if.DUT bif);
     logic [WIDTH-1 : 0] mem [0:DEPTH-1];
 
     assign bif.ready = 1'b1;
