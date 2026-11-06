@@ -6,3 +6,5 @@
   Testbench Language Features*, Springer.
 - Ray Salemi, *The UVM Primer: A Step-by-Step Introduction to the Universal
   Verification Methodology*, Boston Light Press, 2013.
+
+![Enjoy the UVM](images/enjoy_the_uvm.png)

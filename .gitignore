@@ -6,3 +6,4 @@ transcript
 *.vcd
 *.vstf
 modelsim.ini
+*.ucdb
